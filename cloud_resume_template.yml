@@ -1,0 +1,16 @@
+Resources:
+  ResumeVisitCounterDynamoDB:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: 'visit_counter'
+        AttributeDefinitions:
+          -
+            AttributeName: 'visit_count'
+            AttributeType: 'S'
+        KeySchema:
+          -
+            AttributeName: 'visit_count'
+            KeyType: 'HASH'
+        ProvisionedThroughput:
+          ReadCapacityUnits: '2'
+          WriteCapacityUnits: '2'
