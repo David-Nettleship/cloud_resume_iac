@@ -14,3 +14,84 @@ Resources:
         ProvisionedThroughput:
           ReadCapacityUnits: '2'
           WriteCapacityUnits: '2'
+
+  ResumeVisitorCountLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt LambdaIAMRole.Arn
+      Code:
+        ZipFile: |
+            import boto3
+
+            def check_table(table):
+                res = table.scan()
+                res = res['Count']
+                if res == 0:
+                    init_table(table)
+
+            def init_table(table):
+                table.put_item(
+                    Item={
+                    'visit_count': 'visit_count',
+                    'visits' : 0,
+                    }
+                )
+
+            def get_count(table):
+                scan = table.scan()
+                count = scan['Items'][0]['visits']
+                return count
+
+            def increment_count(table, count):
+                count += 1
+                table.update_item(
+                    Key={
+                        'visit_count': 'visit_count'
+                    },
+                    UpdateExpression='SET visits = :val',
+                    ExpressionAttributeValues={
+                        ':val': count
+                    }
+                )
+
+            def lambda_handler(event, context):
+                
+                dynamodb = boto3.resource('dynamodb')
+                table = dynamodb.Table('visit_counter')
+
+                #check if table is empty, if so initialise
+                check_table(table)
+
+                r = get_count(table)
+                increment_count(table, r)
+
+      TracingConfig:
+        Mode: Active
+
+  LambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: UpdateVisitorCountDB
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "dynamodb:UpdateItem"
+                  - "dynamodb:Scan"
+                  - "dynamodb:PutItem"
+                Resource: !GetAtt ResumeVisitCounterDynamoDB.Arn
