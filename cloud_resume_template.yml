@@ -95,3 +95,69 @@ Resources:
                   - "dynamodb:Scan"
                   - "dynamodb:PutItem"
                 Resource: !GetAtt ResumeVisitCounterDynamoDB.Arn
+  
+  ResumeVisitorCountAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: 'resume_visit_counter'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ResumeVisitorCountAPIRootGet:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ResumeVisitorCountAPI
+      ResourceId: !GetAtt
+        - ResumeVisitorCountAPI
+        - RootResourceId
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        Credentials: !GetAtt ApiGatewayIamRole.Arn
+        IntegrationHttpMethod: POST
+        Uri: !Sub >-
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ResumeVisitorCountLambda.Arn}/invocations
+  
+  ProdStageAPI:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: Prod
+      DeploymentId: !Ref APIDeployment
+      RestApiId: !Ref ResumeVisitorCountAPI
+
+  APIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ResumeVisitorCountAPIRootGet
+    Properties:
+      RestApiId: !Ref ResumeVisitorCountAPI
+
+  ApiGatewayIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: LambdaAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ResumeVisitorCountLambda.Arn
+
+  ApiGatewayModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref ResumeVisitorCountAPI
+      Schema: {}
