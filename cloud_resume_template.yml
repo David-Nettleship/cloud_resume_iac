@@ -67,6 +67,15 @@ Resources:
                 r = get_count(table)
                 increment_count(table, r)
 
+                return {
+                  'statusCode': 200,
+                  'headers': {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Methods': 'GET'
+                      },
+                      'body': str(r)
+                }
+
       TracingConfig:
         Mode: Active
 
